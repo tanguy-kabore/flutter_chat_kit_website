@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #FAFAFE;
+  color: #1a1a2e;
+}
+
+/* Animated gradient background */
+.gradient-bg {
+  background: linear-gradient(135deg, #5B4A8A 0%, #9C7CF4 50%, #7B6BA8 100%);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #5B4A8A, #9C7CF4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Phone mockup */
+.phone-mockup {
+  background: #1a1a2e;
+  border-radius: 2.5rem;
+  padding: 0.75rem;
+  box-shadow:
+    0 25px 50px -12px rgba(91, 74, 138, 0.35),
+    0 0 0 2px rgba(156, 124, 244, 0.2);
+}
+
+.phone-screen {
+  border-radius: 2rem;
+  overflow: hidden;
+}
+
+/* Floating animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+.animate-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+/* Pulse glow */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(156, 124, 244, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(156, 124, 244, 0.6); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
