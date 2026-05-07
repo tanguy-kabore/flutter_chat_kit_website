@@ -5,78 +5,42 @@ import {
 } from 'lucide-react';
 import { supabase, BUCKET } from '../lib/supabase';
 
-const GH_TOKEN = import.meta.env.VITE_GITHUB_TOKEN;
-const GH_OWNER = import.meta.env.VITE_GITHUB_OWNER;
-const GH_REPO  = import.meta.env.VITE_GITHUB_REPO;
+const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Upload direct vers GitHub Releases depuis le navigateur (pas de limite de taille)
-async function getOrCreateRelease(version) {
-  const headers = {
-    Authorization: `Bearer ${GH_TOKEN}`,
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'ChatKit-Admin',
-    'Content-Type': 'application/json',
-    'X-GitHub-Api-Version': '2022-11-28',
-  };
-
-  // Try creating
-  const createRes = await fetch(
-    `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases`,
-    { method: 'POST', headers, body: JSON.stringify({ tag_name: `v${version}`, name: `ChatKit v${version}`, draft: false, prerelease: false }) }
-  );
-  if (createRes.ok) return (await createRes.json()).id;
-
-  // Already exists — fetch it
-  if (createRes.status === 422) {
-    const getRes = await fetch(
-      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases/tags/v${version}`,
-      { headers }
-    );
-    if (!getRes.ok) throw new Error('Impossible de récupérer la release GitHub existante');
-    return (await getRes.json()).id;
-  }
-
-  const err = await createRes.json().catch(() => ({}));
-  throw new Error(err.message ?? `GitHub API: ${createRes.status}`);
-}
-
+// Upload via Edge Function (proxy vers GitHub — contourne CORS de uploads.github.com)
 function uploadToGitHub(version, file, onProgress) {
   return new Promise(async (resolve, reject) => {
     try {
-      onProgress(2);
-      const releaseId = await getOrCreateRelease(version);
-      onProgress(5);
+      // Refresh pour avoir un token valide (évite le 502 token expiré)
+      const { data } = await supabase.auth.refreshSession();
+      const token = data?.session?.access_token ?? SUPABASE_ANON;
 
-      const fileName = `chatkit-v${version}.apk`;
-      const uploadUrl = `https://uploads.github.com/repos/${GH_OWNER}/${GH_REPO}/releases/${releaseId}/assets?name=${encodeURIComponent(fileName)}`;
-
+      const url = `${SUPABASE_URL}/functions/v1/upload-release?version=${encodeURIComponent(version)}`;
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', uploadUrl);
-      xhr.setRequestHeader('Authorization', `Bearer ${GH_TOKEN}`);
+      xhr.open('POST', url);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.setRequestHeader('Content-Type', 'application/vnd.android.package-archive');
-      xhr.setRequestHeader('Accept', 'application/vnd.github+json');
-      xhr.setRequestHeader('X-GitHub-Api-Version', '2022-11-28');
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
-          onProgress(5 + Math.round((e.loaded / e.total) * 90));
+          onProgress(Math.round((e.loaded / e.total) * 95));
         }
       };
 
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
-            const asset = JSON.parse(xhr.responseText);
-            resolve(asset.browser_download_url);
+            resolve(JSON.parse(xhr.responseText).download_url);
           } catch {
-            reject(new Error('Réponse invalide de GitHub'));
+            reject(new Error('Réponse invalide de la fonction'));
           }
         } else {
           try {
             const body = JSON.parse(xhr.responseText);
-            reject(new Error(body.message || `GitHub upload: ${xhr.status}`));
+            reject(new Error(body.error || `Erreur Edge Function: ${xhr.status}`));
           } catch {
-            reject(new Error(`Erreur serveur GitHub: ${xhr.status}`));
+            reject(new Error(`Erreur serveur: ${xhr.status}`));
           }
         }
       };

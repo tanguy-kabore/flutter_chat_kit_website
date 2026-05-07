@@ -1,12 +1,10 @@
-import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, content-length",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -20,7 +18,6 @@ serve(async (req: Request) => {
       throw new Error("Secrets GitHub non configurés sur Supabase");
     }
 
-    // Version dans les query params, fichier en corps brut (pas de FormData = pas de buffering)
     const url = new URL(req.url);
     const version = url.searchParams.get("version") ?? "";
     if (!version) throw new Error("Paramètre 'version' manquant");
@@ -28,19 +25,21 @@ serve(async (req: Request) => {
     const fileName = `chatkit-v${version}.apk`;
     const contentLength = req.headers.get("content-length") ?? "";
 
-    // 1. Créer la release GitHub (ou récupérer si elle existe déjà)
+    const ghHeaders = {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "ChatKit-Admin",
+      "X-GitHub-Api-Version": "2022-11-28",
+    };
+
+    // 1. Créer ou récupérer la release GitHub
     let releaseId: number;
 
     const createRes = await fetch(
       `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases`,
       {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${GITHUB_TOKEN}`,
-          "Content-Type": "application/json",
-          Accept: "application/vnd.github+json",
-          "User-Agent": "ChatKit-Admin",
-        },
+        headers: { ...ghHeaders, "Content-Type": "application/json" },
         body: JSON.stringify({
           tag_name: `v${version}`,
           name: `ChatKit v${version}`,
@@ -53,16 +52,9 @@ serve(async (req: Request) => {
     if (createRes.ok) {
       releaseId = (await createRes.json()).id;
     } else if (createRes.status === 422) {
-      // Tag/release déjà existant — on le récupère
       const getRes = await fetch(
         `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases/tags/v${version}`,
-        {
-          headers: {
-            Authorization: `Bearer ${GITHUB_TOKEN}`,
-            Accept: "application/vnd.github+json",
-            "User-Agent": "ChatKit-Admin",
-          },
-        }
+        { headers: ghHeaders }
       );
       if (!getRes.ok) throw new Error("Impossible de récupérer la release existante");
       releaseId = (await getRes.json()).id;
@@ -71,12 +63,26 @@ serve(async (req: Request) => {
       throw new Error(err.message ?? `GitHub API: ${createRes.status}`);
     }
 
-    // 2. Pipe le corps de la requête directement vers GitHub (zéro buffering mémoire)
+    // 2. Supprimer l'asset existant si même nom (re-upload)
+    const listRes = await fetch(
+      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases/${releaseId}/assets`,
+      { headers: ghHeaders }
+    );
+    if (listRes.ok) {
+      const assets = await listRes.json() as Array<{ id: number; name: string }>;
+      const existing = assets.find((a) => a.name === fileName);
+      if (existing) {
+        await fetch(
+          `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/releases/assets/${existing.id}`,
+          { method: "DELETE", headers: ghHeaders }
+        );
+      }
+    }
+
+    // 3. Streamer le corps directement vers GitHub (pas de buffering RAM)
     const uploadHeaders: Record<string, string> = {
-      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      ...ghHeaders,
       "Content-Type": "application/vnd.android.package-archive",
-      Accept: "application/vnd.github+json",
-      "User-Agent": "ChatKit-Admin",
     };
     if (contentLength) uploadHeaders["Content-Length"] = contentLength;
 
@@ -86,7 +92,7 @@ serve(async (req: Request) => {
         method: "POST",
         headers: uploadHeaders,
         body: req.body,
-        // @ts-ignore
+        // @ts-ignore — required for streaming in Deno
         duplex: "half",
       }
     );
