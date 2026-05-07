@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   LogOut, Upload, Trash2, Package, Calendar, Download,
-  FileText, Plus, X, MessageCircle, RefreshCw, Edit3, Check, Bug,
+  FileText, Plus, X, MessageCircle, RefreshCw, Edit3, Check, Bug, Building2,
 } from 'lucide-react';
 import { supabase, BUCKET } from '../lib/supabase';
 import BugReportsAdmin from './BugReportsAdmin';
+import EnterpriseAdmin from './EnterpriseAdmin';
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -66,6 +67,7 @@ export default function AdminDashboard({ onLogout }) {
   const [editingId, setEditingId] = useState(null);
   const [editChangelog, setEditChangelog] = useState('');
   const [bugCount, setBugCount] = useState(0);
+  const [leadCount, setLeadCount] = useState(0);
   const fileRef = useRef(null);
 
   // Form state
@@ -78,6 +80,8 @@ export default function AdminDashboard({ onLogout }) {
     // Badge count for open bug reports
     supabase.from('bug_reports').select('id', { count: 'exact', head: true }).eq('status', 'open')
       .then(({ count }) => setBugCount(count || 0));
+    supabase.from('enterprise_leads').select('id', { count: 'exact', head: true }).eq('status', 'new')
+      .then(({ count }) => setLeadCount(count || 0));
   }, []);
 
   async function fetchReleases() {
@@ -285,12 +289,30 @@ export default function AdminDashboard({ onLogout }) {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('enterprise')}
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-t-xl transition-all ${
+              activeTab === 'enterprise'
+                ? 'bg-white text-violet-deep shadow-sm'
+                : 'text-white/70 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Building2 className="w-4 h-4" /> Entreprises
+            {leadCount > 0 && (
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-yellow-400 text-white text-[10px] font-bold">
+                {leadCount > 99 ? '99+' : leadCount}
+              </span>
+            )}
+          </button>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         {/* ── TAB: Bugs ── */}
         {activeTab === 'bugs' && <BugReportsAdmin />}
+
+        {/* ── TAB: Enterprise ── */}
+        {activeTab === 'enterprise' && <EnterpriseAdmin />}
 
         {/* ── TAB: Releases ── */}
         {activeTab === 'releases' && <>

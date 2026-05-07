@@ -209,3 +209,67 @@ BEGIN
       bucket_id = 'bug-media' AND auth.role() = 'authenticated'
     );
 END $$;
+
+-- 5. TABLE enterprise_leads
+-- -------------------------
+CREATE TABLE IF NOT EXISTS enterprise_leads (
+  id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  -- Contact
+  contact_name  TEXT NOT NULL,
+  contact_email TEXT NOT NULL,
+  contact_phone TEXT,
+  -- Company
+  company_name  TEXT NOT NULL,
+  company_size  TEXT,
+  sector        TEXT,
+  website       TEXT,
+  -- Project
+  budget        TEXT,
+  timeline      TEXT,
+  features      TEXT[],
+  message       TEXT,
+  -- Pipeline
+  status        TEXT NOT NULL DEFAULT 'new'
+                  CHECK (status IN ('new','contacted','negotiating','won','lost')),
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS enterprise_leads_updated_at ON enterprise_leads;
+CREATE TRIGGER enterprise_leads_updated_at
+  BEFORE UPDATE ON enterprise_leads
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+ALTER TABLE enterprise_leads ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  BEGIN
+    DROP POLICY "Public insert enterprise_leads" ON enterprise_leads;
+  EXCEPTION WHEN undefined_object THEN NULL;
+  END;
+  CREATE POLICY "Public insert enterprise_leads" ON enterprise_leads
+    FOR INSERT WITH CHECK (true);
+
+  BEGIN
+    DROP POLICY "Admin read enterprise_leads" ON enterprise_leads;
+  EXCEPTION WHEN undefined_object THEN NULL;
+  END;
+  CREATE POLICY "Admin read enterprise_leads" ON enterprise_leads
+    FOR SELECT USING (auth.role() = 'authenticated');
+
+  BEGIN
+    DROP POLICY "Admin update enterprise_leads" ON enterprise_leads;
+  EXCEPTION WHEN undefined_object THEN NULL;
+  END;
+  CREATE POLICY "Admin update enterprise_leads" ON enterprise_leads
+    FOR UPDATE USING (auth.role() = 'authenticated')
+    WITH CHECK (auth.role() = 'authenticated');
+
+  BEGIN
+    DROP POLICY "Admin delete enterprise_leads" ON enterprise_leads;
+  EXCEPTION WHEN undefined_object THEN NULL;
+  END;
+  CREATE POLICY "Admin delete enterprise_leads" ON enterprise_leads
+    FOR DELETE USING (auth.role() = 'authenticated');
+END $$;
