@@ -6,12 +6,15 @@ import {
 import { supabase } from '../lib/supabase';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Upload via Supabase Edge Function — corps brut + XHR pour vraie progression
 function uploadToGitHub(version, file, onProgress) {
   return new Promise(async (resolve, reject) => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const token = session?.access_token;
+    // Refresh session first to avoid expired token → 502
+    const { data: refreshed } = await supabase.auth.refreshSession();
+    const session = refreshed?.session;
+    const token = session?.access_token ?? SUPABASE_ANON_KEY;
 
     const url = `${SUPABASE_URL}/functions/v1/upload-release?version=${encodeURIComponent(version)}`;
 
