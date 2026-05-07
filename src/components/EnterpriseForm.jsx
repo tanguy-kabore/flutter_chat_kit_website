@@ -160,6 +160,7 @@ export default function EnterpriseForm() {
       });
       if (error) throw error;
       setStatus('success');
+      document.getElementById('enterprise')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
       setErrorMsg(err.message || 'Une erreur est survenue.');
       setStatus('error');

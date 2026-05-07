@@ -131,6 +131,7 @@ export default function BugReportForm() {
       }
 
       setStatus('success');
+      document.getElementById('bug-report')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) {
       setErrorMsg(err.message || 'Une erreur est survenue.');
       setStatus('error');
