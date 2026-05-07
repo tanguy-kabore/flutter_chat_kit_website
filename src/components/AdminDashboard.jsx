@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   LogOut, Upload, Trash2, Package, Calendar, Download,
-  FileText, Plus, X, MessageCircle, RefreshCw, Edit3, Check,
+  FileText, Plus, X, MessageCircle, RefreshCw, Edit3, Check, Bug,
 } from 'lucide-react';
 import { supabase, BUCKET } from '../lib/supabase';
+import BugReportsAdmin from './BugReportsAdmin';
 
 const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -55,6 +56,7 @@ function uploadToGitHub(version, file, onProgress) {
 }
 
 export default function AdminDashboard({ onLogout }) {
+  const [activeTab, setActiveTab] = useState('releases');
   const [releases, setReleases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -63,6 +65,7 @@ export default function AdminDashboard({ onLogout }) {
   const [uploadStep, setUploadStep] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editChangelog, setEditChangelog] = useState('');
+  const [bugCount, setBugCount] = useState(0);
   const fileRef = useRef(null);
 
   // Form state
@@ -72,6 +75,9 @@ export default function AdminDashboard({ onLogout }) {
 
   useEffect(() => {
     fetchReleases();
+    // Badge count for open bug reports
+    supabase.from('bug_reports').select('id', { count: 'exact', head: true }).eq('status', 'open')
+      .then(({ count }) => setBugCount(count || 0));
   }, []);
 
   async function fetchReleases() {
@@ -238,17 +244,10 @@ export default function AdminDashboard({ onLogout }) {
             </div>
             <div>
               <h1 className="text-white font-bold text-lg">ChatKit Admin</h1>
-              <p className="text-white/50 text-xs">Gestion des versions</p>
+              <p className="text-white/50 text-xs">Tableau de bord</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={fetchReleases}
-              className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
-              title="Actualiser"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
             <button
               onClick={handleLogout}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white text-sm font-medium"
@@ -258,9 +257,43 @@ export default function AdminDashboard({ onLogout }) {
             </button>
           </div>
         </div>
+
+        {/* Tabs */}
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-0 flex gap-1">
+          <button
+            onClick={() => setActiveTab('releases')}
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-t-xl transition-all ${
+              activeTab === 'releases'
+                ? 'bg-white text-violet-deep shadow-sm'
+                : 'text-white/70 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Package className="w-4 h-4" /> Versions
+          </button>
+          <button
+            onClick={() => setActiveTab('bugs')}
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-t-xl transition-all ${
+              activeTab === 'bugs'
+                ? 'bg-white text-violet-deep shadow-sm'
+                : 'text-white/70 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Bug className="w-4 h-4" /> Rapports de bugs
+            {bugCount > 0 && (
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                {bugCount > 99 ? '99+' : bugCount}
+              </span>
+            )}
+          </button>
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+        {/* ── TAB: Bugs ── */}
+        {activeTab === 'bugs' && <BugReportsAdmin />}
+
+        {/* ── TAB: Releases ── */}
+        {activeTab === 'releases' && <>
         {/* Add button */}
         {!showForm && (
           <button
@@ -479,6 +512,7 @@ export default function AdminDashboard({ onLogout }) {
             ))}
           </div>
         )}
+        </>}
       </main>
     </div>
   );

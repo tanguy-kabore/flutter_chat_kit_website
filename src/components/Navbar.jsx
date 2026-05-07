@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageCircle, Menu, X } from 'lucide-react';
+import { MessageCircle, Menu, X, Bug } from 'lucide-react';
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -25,6 +25,9 @@ export default function Navbar() {
             </a>
             <a href="#download" className="text-sm font-medium text-gray-600 hover:text-violet-deep transition-colors">
               Télécharger
+            </a>
+            <a href="#bug-report" className="flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-violet-deep transition-colors">
+              <Bug className="w-4 h-4" /> Signaler un bug
             </a>
             <a
               href="#download"
@@ -59,6 +62,13 @@ export default function Navbar() {
               className="block px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-violet-pale hover:text-violet-deep transition-colors"
             >
               Télécharger
+            </a>
+            <a
+              href="#bug-report"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-violet-pale hover:text-violet-deep transition-colors"
+            >
+              <Bug className="w-4 h-4" /> Signaler un bug
             </a>
             <a
               href="#download"

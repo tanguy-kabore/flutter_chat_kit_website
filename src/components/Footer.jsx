@@ -20,6 +20,7 @@ export default function Footer() {
           <div className="flex items-center gap-8 text-sm text-gray-400">
             <a href="#features" className="hover:text-violet-accent transition-colors">Fonctionnalités</a>
             <a href="#download" className="hover:text-violet-accent transition-colors">Télécharger</a>
+            <a href="#bug-report" className="hover:text-violet-accent transition-colors">Signaler un bug</a>
           </div>
 
           {/* Copyright */}
