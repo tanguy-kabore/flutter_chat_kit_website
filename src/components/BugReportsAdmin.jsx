@@ -3,8 +3,71 @@ import {
   Bug, RefreshCw, ChevronDown, ChevronUp, ExternalLink,
   User, Mail, Smartphone, Calendar, Tag, AlertTriangle,
   CheckCircle, Clock, XCircle, Trash2, Image, Film, X,
+  Download, FileJson, FileText, ChevronRight,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+
+// ── Export helpers ──────────────────────────────────────────
+function triggerDownload(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function reportsToCsv(rows) {
+  const COLS = ['id','title','severity','status','category','name','email','device','app_version','description','steps','created_at','updated_at'];
+  const escape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const header = COLS.join(',');
+  const lines  = rows.map((r) => COLS.map((c) => escape(r[c])).join(','));
+  return [header, ...lines].join('\n');
+}
+
+function exportJson(rows, filename) {
+  triggerDownload(JSON.stringify(rows, null, 2), filename, 'application/json');
+}
+
+function exportCsv(rows, filename) {
+  triggerDownload(reportsToCsv(rows), filename, 'text/csv;charset=utf-8;');
+}
+
+function ExportMenu({ onCsv, onJson, label = 'Exporter' }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-600 hover:border-violet-soft hover:text-violet-deep transition-all shadow-sm"
+      >
+        <Download className="w-3.5 h-3.5" />
+        {label}
+        <ChevronRight className={`w-3 h-3 transition-transform ${open ? 'rotate-90' : ''}`} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 mt-1.5 z-20 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden w-36">
+            <button
+              onClick={() => { onCsv(); setOpen(false); }}
+              className="flex items-center gap-2 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-violet-pale transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5 text-green-500" /> Export CSV
+            </button>
+            <button
+              onClick={() => { onJson(); setOpen(false); }}
+              className="flex items-center gap-2 w-full px-4 py-2.5 text-xs text-gray-700 hover:bg-violet-pale transition-colors"
+            >
+              <FileJson className="w-3.5 h-3.5 text-blue-500" /> Export JSON
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 const SEVERITY_STYLE = {
   low:      { label: 'Faible',   cls: 'bg-green-100 text-green-700' },
@@ -83,7 +146,7 @@ function MediaGallery({ reportId }) {
   );
 }
 
-function BugCard({ report, onStatusChange, onDelete }) {
+function BugCard({ report, onStatusChange, onDelete, onExport }) {
   const [expanded, setExpanded] = useState(false);
   const sev = SEVERITY_STYLE[report.severity] ?? SEVERITY_STYLE.medium;
   const sta = STATUS_STYLE[report.status] ?? STATUS_STYLE.open;
@@ -129,6 +192,11 @@ function BugCard({ report, onStatusChange, onDelete }) {
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
+            <ExportMenu
+              label=""
+              onCsv={() => onExport(report, 'csv')}
+              onJson={() => onExport(report, 'json')}
+            />
             <button
               onClick={() => onDelete(report)}
               className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors"
@@ -196,6 +264,10 @@ function BugCard({ report, onStatusChange, onDelete }) {
   );
 }
 
+function slugify(title) {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 40);
+}
+
 export default function BugReportsAdmin() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -217,6 +289,22 @@ export default function BugReportsAdmin() {
   async function updateStatus(id, status) {
     await supabase.from('bug_reports').update({ status }).eq('id', id);
     setReports((prev) => prev.map((r) => r.id === id ? { ...r, status } : r));
+  }
+
+  function handleExportOne(report, format) {
+    const slug = slugify(report.title);
+    const ts   = new Date(report.created_at).toISOString().slice(0,10);
+    const name = `bug-${ts}-${slug}`;
+    if (format === 'csv') exportCsv([report], `${name}.csv`);
+    else exportJson([report], `${name}.json`);
+  }
+
+  function handleExportAll(format) {
+    const ts = new Date().toISOString().slice(0,10);
+    const label = filter !== 'all' ? `-${filter}` : '';
+    const name = `bugs-export${label}-${ts}`;
+    if (format === 'csv') exportCsv(filtered, `${name}.csv`);
+    else exportJson(filtered, `${name}.json`);
   }
 
   async function deleteReport(report) {
@@ -270,6 +358,13 @@ export default function BugReportsAdmin() {
         >
           <RefreshCw className="w-4 h-4" />
         </button>
+        {filtered.length > 0 && (
+          <ExportMenu
+            label={`Exporter (${filtered.length})`}
+            onCsv={() => handleExportAll('csv')}
+            onJson={() => handleExportAll('json')}
+          />
+        )}
 
         <div className="flex gap-2 flex-wrap">
           {[{ value: 'all', label: 'Tous' }, ...STATUS_OPTIONS].map((o) => (
@@ -325,6 +420,7 @@ export default function BugReportsAdmin() {
               report={r}
               onStatusChange={updateStatus}
               onDelete={deleteReport}
+              onExport={handleExportOne}
             />
           ))}
         </div>
