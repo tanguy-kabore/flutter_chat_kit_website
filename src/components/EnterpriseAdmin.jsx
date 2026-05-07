@@ -1,11 +1,53 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import {
-  Building2, Mail, Phone, Globe, Users, DollarSign, Calendar,
+  Building2, Mail, Phone, Globe, Users, Calendar,
   MessageSquare, RefreshCw, Trash2, ChevronDown, ChevronUp,
   ExternalLink, Tag, CheckCircle, Clock, XCircle, AlertTriangle,
-  FileText, FileJson, ChevronRight, Download, Star, Briefcase,
+  FileText, FileJson, ChevronRight, Download, Star, Briefcase, Timer,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+
+const SLA_MS = 48 * 60 * 60 * 1000;
+
+function useCountdown(createdAt) {
+  const deadline = new Date(createdAt).getTime() + SLA_MS;
+  const calc = useCallback(() => {
+    const diff = deadline - Date.now();
+    if (diff <= 0) return null;
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    return { h, m, s, diff, pct: Math.max(0, (diff / SLA_MS) * 100) };
+  }, [deadline]);
+  const [tick, setTick] = useState(calc);
+  useEffect(() => {
+    const id = setInterval(() => setTick(calc()), 1000);
+    return () => clearInterval(id);
+  }, [calc]);
+  return tick;
+}
+
+function Countdown({ createdAt, status }) {
+  const tick = useCountdown(createdAt);
+  if (status !== 'new' && status !== 'contacted') return null;
+  if (!tick) {
+    return (
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-100 text-red-600 text-xs font-bold">
+        <Timer className="w-3 h-3" /> SLA dépassé
+      </div>
+    );
+  }
+  const urgent = tick.pct < 25;
+  const warning = tick.pct < 50;
+  const color = urgent ? 'bg-red-100 text-red-600' : warning ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-700';
+  const pad = (n) => String(n).padStart(2, '0');
+  return (
+    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${color}`}>
+      <Timer className="w-3 h-3" />
+      {pad(tick.h)}h {pad(tick.m)}m {pad(tick.s)}s
+    </div>
+  );
+}
 
 const STATUS_STYLE = {
   new:         { label: 'Nouveau',      icon: Star,          cls: 'bg-blue-100 text-blue-700' },
@@ -73,6 +115,7 @@ function LeadCard({ lead, onStatusChange, onDelete }) {
               <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${sta.cls}`}>
                 <StatusIcon className="w-3 h-3" /> {sta.label}
               </span>
+              <Countdown createdAt={lead.created_at} status={lead.status} />
               {lead.sector && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-violet-pale text-violet-mid">
                   <Briefcase className="w-3 h-3" /> {lead.sector}
@@ -140,18 +183,6 @@ function LeadCard({ lead, onStatusChange, onDelete }) {
       {/* Expanded */}
       {expanded && (
         <div className="px-5 pb-5 border-t border-gray-50 pt-4 space-y-4">
-          {lead.budget && (
-            <div className="flex items-start gap-2">
-              <DollarSign className="w-4 h-4 text-violet-soft mt-0.5 flex-shrink-0" />
-              <div><p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Budget</p><p className="text-sm text-gray-700">{lead.budget}</p></div>
-            </div>
-          )}
-          {lead.timeline && (
-            <div className="flex items-start gap-2">
-              <Calendar className="w-4 h-4 text-violet-soft mt-0.5 flex-shrink-0" />
-              <div><p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Délai</p><p className="text-sm text-gray-700">{lead.timeline}</p></div>
-            </div>
-          )}
           {lead.features?.length > 0 && (
             <div>
               <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide mb-2 flex items-center gap-1"><Tag className="w-3 h-3" /> Fonctionnalités souhaitées</p>

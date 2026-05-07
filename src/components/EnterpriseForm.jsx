@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
-  Building2, Mail, Phone, User, Globe, Users, DollarSign,
-  Calendar, MessageSquare, Send, CheckCircle, AlertCircle,
+  Building2, Mail, Phone, User, Globe, Users,
+  MessageSquare, Send, CheckCircle, AlertCircle,
   ChevronDown, Briefcase, Zap, Shield, Settings, Star,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -25,23 +25,6 @@ const SECTORS = [
   'Télécommunications',
   'Technologie / IT',
   'Autre',
-];
-
-const BUDGETS = [
-  'Moins de 500 000 FCFA',
-  '500 000 – 2 000 000 FCFA',
-  '2 000 000 – 5 000 000 FCFA',
-  '5 000 000 – 10 000 000 FCFA',
-  'Plus de 10 000 000 FCFA',
-  'À définir ensemble',
-];
-
-const TIMELINES = [
-  'Dès que possible (< 1 mois)',
-  'Court terme (1 – 3 mois)',
-  'Moyen terme (3 – 6 mois)',
-  'Long terme (6 – 12 mois)',
-  'Pas encore défini',
 ];
 
 const FEATURES = [
@@ -141,7 +124,7 @@ export default function EnterpriseForm() {
   const [form, setForm] = useState({
     contact_name: '', contact_email: '', contact_phone: '',
     company_name: '', company_size: '', sector: '', website: '',
-    budget: '', timeline: '', message: '',
+    message: '',
     features: [],
   });
   const [status, setStatus] = useState('idle');
@@ -171,8 +154,6 @@ export default function EnterpriseForm() {
         company_size:  form.company_size || null,
         sector:        form.sector || null,
         website:       form.website.trim() || null,
-        budget:        form.budget || null,
-        timeline:      form.timeline || null,
         features:      form.features.length ? form.features : null,
         message:       form.message.trim() || null,
         status:        'new',
@@ -306,10 +287,6 @@ export default function EnterpriseForm() {
               <h3 className="text-xs font-semibold text-violet-mid uppercase tracking-widest mb-5">
                 Détails du projet
               </h3>
-              <div className="grid sm:grid-cols-2 gap-4 mb-4">
-                <SelectField label="Budget estimé" icon={DollarSign} value={form.budget} onChange={(v) => set('budget', v)} options={BUDGETS} placeholder="Sélectionner..." />
-                <SelectField label="Délai souhaité" icon={Calendar} value={form.timeline} onChange={(v) => set('timeline', v)} options={TIMELINES} placeholder="Sélectionner..." />
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   <MessageSquare className="inline w-4 h-4 mr-1.5 text-gray-400" />
